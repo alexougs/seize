@@ -27,7 +27,10 @@
       while ((m = re.exec(lt))) {
         D.splitToken(m[0]).forEach(function (part) {
           var s = m.index + part.o, raw = part.t, e = D.entry(raw);
-          var tok = { s: s, e: s + raw.length, entry: e, clitic: !!CLITICS[e.w], first: S.length };
+          var chosen = opts.pron && opts.pron(lt, line.tokens.length);
+          if (chosen) e = D.entryWith(raw, chosen);
+          var tok = { s: s, e: s + raw.length, entry: e, clitic: !!CLITICS[e.w], first: S.length, chosen: !!chosen };
+          tok.guess = e.src === 'devine' && e.sylls.some(function (z) { return z.v; });
           var fin = -1;
           e.sylls.forEach(function (sy, k) {
             if (!sy.v) return;
@@ -47,6 +50,9 @@
       // dernière syllabe forte du vers
       for (var q = line.last - 1; q >= line.first; q--) if (S[q].fin) { S[q].lf = true; break; }
     });
+    var parent = {};                       // vers dont les fins riment ensemble -> même lettre du schéma
+    function root(x) { while (parent[x] !== undefined && parent[x] !== x) x = parent[x]; return x; }
+    function join(x, y) { x = root(x); y = root(y); parent[x] = x; parent[y] = y; if (x !== y) parent[Math.max(x, y)] = Math.min(x, y); }
 
     /* ---- Rimes ---- */
     function pair(a, b) {
@@ -87,8 +93,18 @@
         if (!pr || pr.sc < need) continue;
         var strong = pr.sc >= 2;
         mark(a, pr.len, strong); mark(b, pr.len, strong);
+        if (A.lf && B.lf) join(A.line, B.line);
       }
     }
+    var letters = {}, curBlock = -1, nextLetter = 0;
+    lines.forEach(function (line, li) {
+      if (line.kind !== 'verse') return;
+      if (line.block !== curBlock) { curBlock = line.block; letters = {}; nextLetter = 0; }
+      if (parent[li] === undefined) { line.letter = ''; return; }
+      var r = root(li);
+      if (letters[r] === undefined) letters[r] = String.fromCharCode(65 + (nextLetter++ % 26));
+      line.letter = letters[r];
+    });
 
     /* ---- Assonances : une même voyelle qui revient dans le vers ---- */
     lines.forEach(function (line, li) {
@@ -142,23 +158,25 @@
 
   /* Découpe un vers en morceaux prêts à afficher : [{t, cls, lvl, fam}]
      level : 'rimes' | 'asso' | 'tout' ; allit : booléen */
-  function runs(res, li, level, withAllit) {
+  function runs(res, li, level, withAllit, only) {
     var line = res.lines[li], text = line.text, n = text.length;
     if (line.kind !== 'verse') return [{ t: text }];
     var cls = new Array(n), lvl = new Array(n), fam = new Array(n), sid = new Array(n), tk = new Array(n);
     line.tokens.forEach(function (t, ti) { for (var c = t.s; c < t.e && c < n; c++) tk[c] = ti; });
     for (var q = line.first; q < line.last; q++) {
       var s = res.syl[q], L = 0;
-      if (s.rh) L = s.rh + 1;                          // 2 = rime, 3 = rime riche
+      if (only) { if (s.cls === only && !(s.weak && !s.rh)) L = s.rh ? s.rh + 1 : 1; }     // un seul son, partout où il sonne
+      else if (s.rh) L = s.rh + 1;                     // 2 = rime, 3 = rime riche
       else if (!s.weak && (level === 'tout' || (level === 'asso' && s.as))) L = 1;
       if (!L) continue;
       for (var c = s.s; c < s.e && c < n; c++) { cls[c] = s.cls; lvl[c] = L; sid[c] = q; }
     }
-    if (withAllit) res.allit.forEach(function (a) { if (a.line === li) for (var c = a.s; c < a.e && c < n; c++) fam[c] = a.fam; });
+    if (withAllit && !only) res.allit.forEach(function (a) { if (a.line === li) for (var c = a.s; c < a.e && c < n; c++) fam[c] = a.fam; });
     var out = [], cur = null;
     for (var i = 0; i < n; i++) {
       if (!cur || cur.cls !== cls[i] || cur.lvl !== lvl[i] || cur.fam !== fam[i] || cur.sid !== sid[i] || cur.tk !== tk[i]) {
         cur = { t: '', cls: cls[i], lvl: lvl[i], fam: fam[i], sid: sid[i], tk: tk[i] }; out.push(cur);
+        if (tk[i] != null && line.tokens[tk[i]].guess) cur.unk = true;
       }
       cur.t += text[i];
     }

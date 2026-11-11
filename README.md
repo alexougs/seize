@@ -5,6 +5,9 @@ Web app pour écrire des textes de rap. Elle fonctionne hors ligne et s'installe
 - Coloration des rimes, assonances et allitérations (une couleur par son)
 - Recherche de rimes avec filtres : syllabes, type de mot, fréquence, argot
 - Dossiers, sections, historique des versions, mesures
+- Prononciation au choix mot par mot (homographes, e muets), mots devinés signalés
+- Rimes en deux mots, réserve de rimes par texte, carnet d'idées
+- Schéma de rimes, densité par bloc, affichage d'un seul son
 - Export texte brut et PDF, avec ou sans couleurs
 - Les textes restent sur l'appareil ; « Réglages et sauvegarde » permet d'exporter et d'importer une sauvegarde complète
 

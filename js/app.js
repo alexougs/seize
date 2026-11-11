@@ -7,10 +7,24 @@
     legend: $('legend'), chips: $('chips'), count: $('count'), find: $('find'), q: $('q'), results: $('results'), heard: $('heard'),
     sheet: $('sheet'), box: $('sheet-box'), toast: $('toast'), color: $('btn-color'), saveState: $('save-state') };
 
-  var DEFAULTS = { theme: 'auto', level: 'asso', allit: false, bars: false, last: null, find: { mode: 'rime', nsyl: 0, pos: 0, freq: 0, argot: false } };
+  var DEFAULTS = { theme: 'auto', level: 'asso', allit: false, bars: false, scheme: false, pinTap: false, last: null, find: { mode: 'rime', nsyl: 0, pos: 0, freq: 0, argot: false } };
   var lib = { folders: [], docs: [], settings: JSON.parse(JSON.stringify(DEFAULTS)), custom: {} };
   var cur = null, text = '', colorOn = false, analysis = null, caret = 0, dictReady = false;
   var dirty = false, baselineDone = false, lastAuto = 0, findLimit = 300, selTok = null;
+  var pron = {}, pins = [], isolate = null, ctxTok = null;     // prononciations choisies par vers, réserve de rimes, son isolé, mot touché
+  function anOpts() { return { pron: function (lt, ti) { var m = pron[lt]; return m ? m[ti] : null; } }; }
+  function docBody() {
+    var keep = {}, lines = {};
+    text.split('\n').forEach(function (l) { lines[l] = 1; });
+    Object.keys(pron).forEach(function (l) { if (lines[l] && Object.keys(pron[l]).length) keep[l] = pron[l]; });
+    pron = keep;
+    return { text: text, pron: pron, pins: pins };
+  }
+  function ensureIdeas() {
+    var m = docMeta('idees');
+    if (!m) { m = { id: 'idees', title: 'Carnet d’idées', folder: null, created: Date.now(), updated: Date.now() }; lib.docs.push(m); S.set('doc:idees', { text: '' }); S.set('lib', lib); }
+    return m;
+  }
 
   var uid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); };
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -132,8 +146,8 @@
   function flush() {
     if (!cur || !dirty) return;
     dirty = false;
-    S.set('doc:' + cur.id, { text: text });
-    cur.updated = Date.now(); cur.title = el.title.value.trim();
+    S.set('doc:' + cur.id, docBody());
+    cur.updated = Date.now(); if (cur.id !== 'idees') cur.title = el.title.value.trim();
     S.set('lib', lib);
     if (text.trim() && Date.now() - lastAuto > 5 * 60000) { addVersion(cur.id, text, ''); lastAuto = Date.now(); }
   }
@@ -150,8 +164,9 @@
   function openDoc(id) {
     flush();
     cur = docMeta(id); if (!cur) return;
-    text = (S.get('doc:' + id) || {}).text || '';
-    el.ed.value = text; el.title.value = cur.title || '';
+    var body = S.get('doc:' + id) || {};
+    text = body.text || ''; pron = body.pron || {}; pins = (body.pins || []).slice(); isolate = null; ctxTok = null;
+    el.ed.value = text; el.title.value = cur.title || ''; el.title.readOnly = id === 'idees';
     caret = text.length; baselineDone = false; dirty = false; selTok = null;
     lib.settings.last = id; saveLib();
     if (colorOn) renderView();
@@ -171,9 +186,10 @@
   function deleteDoc(id) {
     lib.docs = lib.docs.filter(function (d) { return d.id !== id; });
     S.del('doc:' + id); S.del('ver:' + id);
-    if (!lib.docs.length) newDocMeta();
+    var rest = lib.docs.filter(function (d) { return d.id !== 'idees'; });
+    if (!rest.length) rest = [newDocMeta()];
     S.set('lib', lib);
-    dirty = false; cur = null; openDoc(lib.docs[0].id);
+    dirty = false; cur = null; openDoc(rest[0].id);
   }
 
   function firstLine(id) {
@@ -184,7 +200,7 @@
   function renderLib() {
     var html = '';
     function docsOf(fid) {
-      return lib.docs.filter(function (d) { return (d.folder || null) === fid; }).sort(function (a, b) { return b.updated - a.updated; })
+      return lib.docs.filter(function (d) { return d.id !== 'idees' && (d.folder || null) === fid; }).sort(function (a, b) { return b.updated - a.updated; })
         .map(function (d) {
           return '<button class="doc" data-doc="' + d.id + '"' + (cur && cur.id === d.id ? ' aria-current="true"' : '') + '><b>' + esc(d.title || 'Sans titre') +
             '</b><small>' + esc(firstLine(d.id)) + '</small></button>';
@@ -200,6 +216,10 @@
         (inner || '<div class="empty">Dossier vide</div>') + '</div>';
     });
     el.list.innerHTML = html;
+    var ib = $('open-ideas'), it = (cur && cur.id === 'idees' ? text : (S.get('doc:idees') || {}).text) || '';
+    var n = it.split('\n').filter(function (l) { return l.trim(); }).length;
+    if (cur && cur.id === 'idees') ib.setAttribute('aria-current', 'true'); else ib.removeAttribute('aria-current');
+    $('ideas-sub').textContent = n ? n + ' ligne' + (n > 1 ? 's' : '') : 'Phases et punchlines en vrac';
   }
   function openLib() { el.lib.classList.add('open'); el.scrim.hidden = false; }
   function closeLib() { el.lib.classList.remove('open'); el.scrim.hidden = true; }
@@ -214,7 +234,7 @@
     if (colorOn || !dictReady) { el.count.textContent = ''; return; }
     var l = lineAt(caret);
     if (!l.t.trim() || R.SECTION_RE.test(l.t)) { el.count.textContent = ''; return; }
-    var n = R.analyze(l.t).lines[0].nsyl;
+    var n = R.analyze(l.t, anOpts()).lines[0].nsyl;
     el.count.textContent = n + ' syll.';
     el.count.title = 'Syllabes du vers en cours';
   }
@@ -222,7 +242,7 @@
   document.addEventListener('selectionchange', function () {
     if (document.activeElement === el.ed) { caret = el.ed.selectionStart; updateCount(); }
   });
-  el.title.addEventListener('input', function () { if (cur) { cur.title = el.title.value.trim(); dirty = true; saveSoon(); } });
+  el.title.addEventListener('input', function () { if (cur && cur.id !== 'idees') { cur.title = el.title.value.trim(); dirty = true; saveSoon(); } });
   el.title.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); el.ed.focus(); } });
   window.addEventListener('pagehide', flush);
   document.addEventListener('visibilitychange', function () { if (document.hidden) flush(); });
@@ -249,40 +269,59 @@
     updateCount();
   }
   function renderView() {
-    analysis = R.analyze(text);
-    var st = lib.settings, html = '', used = {}, usedFam = {};
+    analysis = R.analyze(text, anOpts());
+    var st = lib.settings, html = '', used = {}, usedFam = {}, blk = null;
+    analysis.syl.forEach(function (s) { if (s.rh || (!s.weak && (st.level === 'tout' || (st.level === 'asso' && s.as)))) used[s.cls] = 1; });
+    if (isolate) used[isolate] = 1;
+    function closeBlock() {
+      if (!blk || !st.scheme) { blk = null; return; }
+      html += '<div class="sum"><b>' + esc(blk.letters) + '</b> — ' + (blk.tot ? Math.round(100 * blk.rh / blk.tot) : 0) + ' % des syllabes riment</div>';
+      blk = null;
+    }
     analysis.lines.forEach(function (line, li) {
+      if (line.kind !== 'verse' || (blk && blk.id !== line.block)) closeBlock();
+      if (line.kind === 'verse') {
+        if (!blk) blk = { id: line.block, letters: '', rh: 0, tot: 0 };
+        blk.letters += line.letter || '·';
+        for (var q = line.first; q < line.last; q++) { blk.tot++; if (analysis.syl[q].rh) blk.rh++; }
+      }
       var cls = 'ln' + (line.kind === 'section' ? ' section' : '') + (st.bars && line.kind === 'verse' && line.bar % 4 === 0 ? ' four' : '');
       var body = '';
-      R.runs(analysis, li, st.level, st.allit).forEach(function (r) {
+      R.runs(analysis, li, st.level, st.allit, isolate).forEach(function (r) {
         var c = [];
-        if (r.lvl >= 2) { c.push('r', 'c-' + r.cls); if (r.cls === 'in') c.push('in'); used[r.cls] = 1; }
-        else if (r.lvl === 1) { c.push('s', 'c-' + r.cls); used[r.cls] = 1; }
+        if (r.lvl >= 2) { c.push('r', 'c-' + r.cls); if (r.cls === 'in') c.push('in'); }
+        else if (r.lvl === 1) c.push('s', 'c-' + r.cls);
+        if (r.unk) c.push('unk');
         if (r.fam) { c.push('al', 'f-' + r.fam); usedFam[r.fam] = 1; }
         if (c.length || r.tk != null) body += '<span' + (c.length ? ' class="' + c.join(' ') + '"' : '') + (r.tk != null ? ' data-tk="' + li + ':' + r.tk + '"' : '') + '>' + esc(r.t) + '</span>';
         else body += esc(r.t);
       });
       html += '<div class="' + cls + '">' + (st.bars ? '<span class="g">' + (line.kind === 'verse' ? line.bar : '') + '</span>' : '') +
-        '<span class="tx">' + (body || '&nbsp;') + '</span>' + (st.bars ? '<span class="n">' + (line.kind === 'verse' ? line.nsyl : '') + '</span>' : '') + '</div>';
+        '<span class="tx">' + (body || '&nbsp;') + '</span>' + (st.scheme ? '<span class="sch">' + (line.kind === 'verse' ? (line.letter || '·') : '') + '</span>' : '') + (st.bars ? '<span class="n">' + (line.kind === 'verse' ? line.nsyl : '') + '</span>' : '') + '</div>';
     });
+    closeBlock();
     el.view.innerHTML = html || '<div class="hint">Le texte est vide. Touche « Modifier le texte » pour écrire.</div>';
     var chips = P.CLASSES.filter(function (c) { return used[c]; }).map(function (c) {
-      return '<span class="chip r c-' + c + (c === 'in' ? ' in' : '') + '">' + P.CLASS_LABEL[c] + '</span>';
+      return '<button class="chip r c-' + c + (c === 'in' ? ' in' : '') + '" data-iso="' + c + '" aria-pressed="' + (isolate === c) + '" title="Ne montrer que ce son">' + P.CLASS_LABEL[c] + '</button>';
     }).join('');
-    if (st.allit) chips += P.CFAMS.filter(function (f) { return usedFam[f]; }).map(function (f) {
+    el.chips.classList.toggle('iso', !!isolate);
+    if (st.allit && !isolate) chips += P.CFAMS.filter(function (f) { return usedFam[f]; }).map(function (f) {
       return '<span class="chip al f-' + f + '">' + P.CFAM_LABEL[f] + '</span>';
     }).join('');
     el.chips.innerHTML = chips;
     Array.prototype.forEach.call(el.legend.querySelectorAll('[data-level]'), function (b) { b.setAttribute('aria-pressed', b.dataset.level === st.level ? 'true' : 'false'); });
-    $('opt-allit').checked = !!st.allit; $('opt-bars').checked = !!st.bars;
+    $('opt-allit').checked = !!st.allit; $('opt-bars').checked = !!st.bars; $('opt-scheme').checked = !!st.scheme;
   }
   el.color.addEventListener('click', function () { setColor(!colorOn); if (!colorOn) el.ed.focus(); });
   el.legend.addEventListener('click', function (e) {
+    var iso = e.target.closest('[data-iso]');
+    if (iso) { isolate = isolate === iso.dataset.iso ? null : iso.dataset.iso; renderView(); return; }
     var b = e.target.closest('[data-level]'); if (!b) return;
-    lib.settings.level = b.dataset.level; saveLib(); renderView();
+    lib.settings.level = b.dataset.level; isolate = null; saveLib(); renderView();
   });
   $('opt-allit').addEventListener('change', function (e) { lib.settings.allit = e.target.checked; saveLib(); renderView(); });
   $('opt-bars').addEventListener('change', function (e) { lib.settings.bars = e.target.checked; saveLib(); renderView(); });
+  $('opt-scheme').addEventListener('change', function (e) { lib.settings.scheme = e.target.checked; saveLib(); renderView(); });
   el.view.addEventListener('click', function (e) {
     var sp = e.target.closest('span[data-tk]'); if (!sp || !analysis) return;
     var id = sp.dataset.tk.split(':'), line = analysis.lines[+id[0]], tok = line && line.tokens[+id[1]];
@@ -292,7 +331,10 @@
     // le mot touché devient la recherche ; l'ajout se fera à la fin de ce vers
     var off = 0; for (var i = 0; i < +id[0]; i++) off += analysis.lines[i].text.length + 1;
     caret = off + line.text.length;
-    openFind(line.text.slice(tok.s, tok.e).replace(/['’]$/, ''), true);
+    var word = line.text.slice(tok.s, tok.e).replace(/['’]$/, '');
+    if (tok.guess) { customSheet(D.clean(word)); return; }       // prononciation devinée : on la corrige d'un geste
+    ctxTok = { li: +id[0], ti: +id[1], line: line.text };
+    openFind(word, true);
   });
 
   /* ---------- recherche de rimes ---------- */
@@ -304,13 +346,13 @@
     if (!keepKeyboardDown) { el.q.focus(); el.q.select(); }
   }
   function closeFind() {
-    el.find.hidden = true; el.app.classList.remove('finding');
+    el.find.hidden = true; el.app.classList.remove('finding'); ctxTok = null;
     Array.prototype.forEach.call(el.view.querySelectorAll('.sel'), function (x) { x.classList.remove('sel'); });
   }
   function syncFilters() {
     var f = lib.settings.find;
     Array.prototype.forEach.call(el.find.querySelectorAll('[data-mode]'), function (b) { b.setAttribute('aria-pressed', b.dataset.mode === f.mode ? 'true' : 'false'); });
-    $('f-syl').value = f.nsyl; $('f-pos').value = f.pos; $('f-freq').value = f.freq; $('f-argot').checked = !!f.argot;
+    $('f-syl').value = f.nsyl; $('f-pos').value = f.pos; $('f-freq').value = f.freq; $('f-argot').checked = !!f.argot; $('f-pin').checked = !!lib.settings.pinTap;
   }
   function display(r) {
     if (r.flags & D.F.PROPRE && !(r.flags & D.F.PERSO)) return r.w.replace(/(^|[\s\-])([a-zà-ÿ])/g, function (m, a, b) { return a + b.toUpperCase(); });
@@ -318,21 +360,41 @@
   }
   function runSearch() {
     var q = el.q.value.trim();
+    var reserve = pins.length ? '<div class="grp">Réserve de ce texte</div><div class="words">' + pins.map(function (w) {
+      return '<span class="w pin"><button class="pw" data-w="' + esc(w) + '">' + esc(w) + '</button><button class="x" data-unpin="' + esc(w) + '" aria-label="Retirer ' + esc(w) + ' de la réserve">×</button></span>';
+    }).join('') + '</div>' : '';
     if (!q) {
       el.heard.textContent = '';
-      el.results.innerHTML = '<p class="hint">Écris un mot ou la fin d’un vers, par exemple « pas de bol ». Les rimes les plus riches arrivent en premier. Touche un mot pour l’ajouter à ton texte.</p>';
+      el.results.innerHTML = reserve + '<p class="hint">Écris un mot ou la fin d’un vers, par exemple « pas de bol ». Les rimes les plus riches arrivent en premier. Touche un mot pour l’ajouter à ton texte.</p>';
       return;
     }
     if (!dictReady) { el.results.innerHTML = '<p class="hint">Chargement du dictionnaire…</p>'; return; }
     var f = lib.settings.find;
-    var res = D.search(q, { mode: f.mode, nsyl: +f.nsyl, pos: +f.pos, freq: +f.freq, argot: !!f.argot, limit: findLimit });
     var single = /^[A-Za-zÀ-ÖØ-öø-ÿŒœ'’\-]+$/.test(q);
-    el.heard.innerHTML = res.syll ? 'Compris : <b>' + esc(P.readable(res.syll)) + '</b>' + (single ? '<button id="fix-word">Corriger</button>' : '') : '';
-    if (!res.groups.length) {
-      el.results.innerHTML = '<p class="hint">' + (res.syll ? 'Aucun mot ne correspond avec ces filtres. Retire un filtre, ou passe sur « Assonances » pour élargir.' : 'Aucun son reconnu dans cette recherche.') + '</p>';
+    var alts = ctxTok && single ? D.alternatives(q) : [], chosen = ctxTok ? (pron[ctxTok.line] || {})[ctxTok.ti] : null;
+    if (chosen && alts.indexOf(chosen) < 0) chosen = null;
+    var o = { mode: f.mode, nsyl: +f.nsyl, pos: +f.pos, freq: +f.freq, argot: !!f.argot, limit: findLimit, syll: chosen || undefined };
+    var res = f.mode === 'duo' ? D.twoWords(q, o) : D.search(q, o);
+    if (alts.length > 1) el.heard.innerHTML = 'Dans ce vers : <span class="alts">' + alts.map(function (s) {
+      return '<button data-alt="' + esc(s) + '" aria-pressed="' + ((chosen || alts[0]) === s) + '">' + esc(/[aiyuoOeE°2951@§]/.test(s) ? P.readable(s) : P.readable(s) + ' (avalé)') + '</button>';
+    }).join('') + '</span><button id="fix-word">Corriger</button>';
+    else el.heard.innerHTML = res.syll ? 'Compris : <b>' + esc(P.readable(res.syll)) + '</b>' + (single ? '<button id="fix-word">Corriger</button>' : '') : '';
+    function chip(r) {
+      var c = 'w' + (r.flags & D.F.PERSO ? ' perso' : r.flags & D.F.ARGOT ? ' argot' : '');
+      return '<button class="' + c + '" data-w="' + esc(display(r)) + '" title="' + esc(P.readable(r.syll)) + '">' + esc(display(r)) + '</button>';
+    }
+    if (f.mode === 'duo') {
+      el.results.innerHTML = reserve + (res.splits.length ? res.splits.map(function (sp) {
+        return '<div class="grp">Découpe ' + sp.left + ' + ' + sp.right + ' syllabe' + (sp.right > 1 ? 's' : '') + '</div><div class="duo-label">Premier mot</div><div class="words">' + sp.a.map(chip).join('') +
+          '</div><div class="duo-label">Dernier mot</div><div class="words">' + sp.b.map(chip).join('') + '</div>';
+      }).join('') : '<p class="hint">Il faut un son d’au moins deux syllabes pour le couper en deux mots, par exemple « camisole ».</p>');
       return;
     }
-    var html = '';
+    if (!res.groups.length) {
+      el.results.innerHTML = reserve + '<p class="hint">' + (res.syll ? 'Aucun mot ne correspond avec ces filtres. Retire un filtre, ou passe sur « Assonances » pour élargir.' : 'Aucun son reconnu dans cette recherche.') + '</p>';
+      return;
+    }
+    var html = reserve;
     res.groups.forEach(function (g) {
       var label = f.mode === 'asso' ? (g.nv > 1 ? g.nv + ' voyelles identiques' : 'Même voyelle finale')
         : (g.nv > 1 ? 'Rime sur ' + g.nv + ' syllabes' : 'Rime sur la dernière syllabe');
@@ -345,10 +407,11 @@
     el.results.innerHTML = html;
   }
   var searchSoon = debounce(function () { findLimit = 300; runSearch(); el.results.scrollTop = 0; }, 180);
-  el.q.addEventListener('input', searchSoon);
+  el.q.addEventListener('input', function () { ctxTok = null; searchSoon(); });
   el.q.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); el.q.blur(); } });
   $('btn-find').addEventListener('click', function () {
     if (!el.find.hidden) { closeFind(); return; }
+    ctxTok = null;
     var sel = el.ed.selectionStart !== el.ed.selectionEnd && !colorOn ? text.slice(el.ed.selectionStart, el.ed.selectionEnd).trim() : null;
     openFind(sel && sel.length < 60 ? sel : null);
   });
@@ -358,19 +421,41 @@
     if (!t.trim() && l.a > 0) t = lineAt(l.a - 1).t;          // ligne vide : on prend le vers d'avant
     var m = t.match(/[A-Za-zÀ-ÖØ-öø-ÿŒœ]+(?:['’\-][A-Za-zÀ-ÖØ-öø-ÿŒœ]+)*/g);
     if (!m) { toast('Place d’abord le curseur sur un vers.'); return; }
-    el.q.value = m[m.length - 1].replace(/^.*['’]/, ''); findLimit = 300; runSearch();
+    ctxTok = null; el.q.value = m[m.length - 1].replace(/^.*['’]/, ''); findLimit = 300; runSearch();
   });
   el.find.addEventListener('click', function (e) {
     var m = e.target.closest('[data-mode]');
     if (m) { lib.settings.find.mode = m.dataset.mode; saveLib(); syncFilters(); findLimit = 300; runSearch(); return; }
-    var w = e.target.closest('.w');
-    if (w) { insertWord(w.dataset.w); return; }
+    var un = e.target.closest('[data-unpin]');
+    if (un) { pins = pins.filter(function (x) { return x !== un.dataset.unpin; }); touch(); runSearch(); return; }
+    var pw = e.target.closest('.pw');
+    if (pw) { insertWord(pw.dataset.w); return; }
+    var alt = e.target.closest('[data-alt]');
+    if (alt && ctxTok) {                    // prononciation de ce mot dans ce vers
+      var first = D.alternatives(el.q.value.trim())[0], map = pron[ctxTok.line] || (pron[ctxTok.line] = {});
+      if (alt.dataset.alt === first) delete map[ctxTok.ti]; else map[ctxTok.ti] = alt.dataset.alt;
+      touch();
+      if (colorOn) {
+        renderView();
+        Array.prototype.forEach.call(el.view.querySelectorAll('span[data-tk="' + ctxTok.li + ':' + ctxTok.ti + '"]'), function (x) { x.classList.add('sel'); });
+      }
+      runSearch(); return;
+    }
+    var w = e.target.closest('button.w');
+    if (w) {
+      if (lib.settings.pinTap) {
+        if (pins.indexOf(w.dataset.w) < 0) { pins.push(w.dataset.w); touch(); runSearch(); }
+        toast('« ' + w.dataset.w + ' » mis en réserve');
+      } else insertWord(w.dataset.w);
+      return;
+    }
     if (e.target.id === 'more') { findLimit += 600; runSearch(); return; }
     if (e.target.id === 'fix-word') customSheet(el.q.value.trim().toLowerCase());
   });
   ['f-syl', 'f-pos', 'f-freq'].forEach(function (id) {
     $(id).addEventListener('change', function (e) { lib.settings.find[{ 'f-syl': 'nsyl', 'f-pos': 'pos', 'f-freq': 'freq' }[id]] = +e.target.value; saveLib(); findLimit = 300; runSearch(); });
   });
+  $('f-pin').addEventListener('change', function (e) { lib.settings.pinTap = e.target.checked; saveLib(); });
   $('f-argot').addEventListener('change', function (e) { lib.settings.find.argot = e.target.checked; saveLib(); findLimit = 300; runSearch(); });
 
   function insertWord(w) {
@@ -432,16 +517,19 @@
   /* menu du texte */
   $('btn-more').addEventListener('click', function () {
     flush();
+    var isIdeas = cur.id === 'idees';
     sheet('<h2>' + esc(cur.title || 'Sans titre') + '</h2><div class="rows">' +
+      (isIdeas ? '' : '<button class="row" data-a="idea"><span class="grow">Noter une idée dans le carnet<small>Sans quitter ce texte</small></span></button>') +
       '<button class="row" data-a="ver"><span class="grow">Historique des versions<small>' + versions(cur.id).length + ' version(s) gardée(s)</small></span></button>' +
       '<button class="row" data-a="txt"><span class="grow">Exporter en texte brut</span></button>' +
       '<button class="row" data-a="pdf"><span class="grow">Exporter en PDF<small>Texte seul</small></span></button>' +
       '<button class="row" data-a="pdfc"><span class="grow">Exporter en PDF avec les couleurs<small>Avec les réglages de couleur en cours</small></span></button>' +
-      '<button class="row" data-a="move"><span class="grow">Ranger dans un dossier</span></button>' +
-      '<button class="row danger" data-a="del"><span class="grow">Supprimer ce texte</span></button></div>');
+      (isIdeas ? '' : '<button class="row" data-a="move"><span class="grow">Ranger dans un dossier</span></button>' +
+      '<button class="row danger" data-a="del"><span class="grow">Supprimer ce texte</span></button>') + '</div>');
     el.box.onclick = function (e) {
       var b = e.target.closest('[data-a]'); if (!b) return;
-      var a = b.dataset.a, o = { title: cur.title, text: text, level: lib.settings.level, allit: lib.settings.allit };
+      var a = b.dataset.a, o = { title: cur.title, text: text, level: lib.settings.level, allit: lib.settings.allit, analyzeOpts: anOpts() };
+      if (a === 'idea') return ideaSheet();
       if (a === 'ver') return versionsSheet();
       if (a === 'move') return moveSheet();
       if (a === 'del') return confirmSheet('Supprimer « ' + (cur.title || 'Sans titre') + ' » ?', 'Le texte et son historique seront supprimés.', 'Supprimer', function () { deleteDoc(cur.id); });
@@ -481,6 +569,28 @@
       cur.folder = f || null; S.set('lib', lib); renderLib(); closeSheet();
     };
   }
+
+  /* carnet d'idées */
+  function ideaSheet() {
+    sheet('<h2>Noter une idée</h2><label class="field">Phase, punchline, image…<textarea id="idea-in"></textarea></label>' +
+      '<div class="actions"><button class="btn" data-x="no">Annuler</button><button class="btn primary" data-x="ok">Noter dans le carnet</button></div>');
+    var inp = $('idea-in'); inp.focus();
+    el.box.onclick = function (e) {
+      var x = e.target.dataset && e.target.dataset.x; if (!x) return;
+      if (x === 'no') return closeSheet();
+      var idea = inp.value.trim(); if (!idea) return;
+      var m = ensureIdeas();
+      if (cur && cur.id === 'idees') setText((text.trim() ? text.replace(/\s+$/, '') + '\n\n' : '') + idea + '\n', null);
+      else {
+        var b = S.get('doc:idees') || {}, old = b.text || '';
+        S.set('doc:idees', Object.assign({}, b, { text: (old.trim() ? old.replace(/\s+$/, '') + '\n\n' : '') + idea + '\n' }));
+        m.updated = Date.now(); S.set('lib', lib);
+      }
+      closeSheet(); renderLib(); toast('Idée notée dans le carnet');
+    };
+  }
+  $('open-ideas').addEventListener('click', function () { flush(); ensureIdeas(); openDoc('idees'); });
+  $('add-idea').addEventListener('click', function () { closeLib(); ideaSheet(); });
 
   /* bibliothèque */
   $('btn-lib').addEventListener('click', openLib);

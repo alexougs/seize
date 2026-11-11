@@ -1,5 +1,5 @@
 /* Seize — fonctionnement hors ligne. Changer VERSION à chaque mise à jour du dictionnaire. */
-var VERSION = 'seize-v1';
+var VERSION = 'seize-v2';
 var SHELL = ['./', 'index.html', 'css/app.css', 'js/phon.js', 'js/dict.js', 'js/rhyme.js', 'js/store.js', 'js/export.js', 'js/app.js',
   'manifest.webmanifest', 'icons/icon-180.png', 'icons/icon-192.png', 'fonts/bricolage-latin.woff2'];
 var HEAVY = ['data/dict.txt', 'vendor/jspdf.umd.min.js'];

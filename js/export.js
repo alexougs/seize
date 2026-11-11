@@ -72,7 +72,7 @@
   function buildPdf(jspdf, o) {
     var doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
     var M = 20, W = 210 - 2 * M, y = 24, LH = 7.4, FS = 11.5;
-    var res = o.colors ? root.Rhyme.analyze(o.text) : null;
+    var res = o.colors ? root.Rhyme.analyze(o.text, o.analyzeOpts) : null;
     function page() { if (y > 297 - 20) { doc.addPage(); y = 22; } }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(20, 23, 29);
     doc.splitTextToSize(pdfSafe(o.title || 'Sans titre'), W).forEach(function (l) { doc.text(l, M, y); y += 9; });

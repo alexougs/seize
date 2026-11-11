@@ -76,6 +76,29 @@
     cache.set(w, e);
     return e;
   }
+  /* Même mot, autre prononciation choisie pour un vers précis. */
+  function entryWith(raw, syll) {
+    var w = clean(raw), key = w + '|' + syll, hit = cache.get(key);
+    if (hit) return hit;
+    var e = P.entryFromDict(w, syll); e.src = 'choix'; e.w = w;
+    cache.set(key, e);
+    return e;
+  }
+  var EXTRA = { tous: ['tu', 'tus'], plus: ['ply', 'plys', 'plyz'], six: ['sis', 'si', 'siz'], dix: ['dis', 'di', 'diz'], huit: ['8it', '8i'],
+    fait: ['fE', 'fEt'], but: ['by', 'byt'], sens: ['s@s', 's@'], os: ['Os', 'o'], donc: ['d§k', 'd§'], soit: ['swa', 'swat'], cinq: ['s5k', 's5'], vingt: ['v5', 'v5t'] };
+  /* Les façons de dire un mot : homographes (plus, fils), e avalé (p'tit), e final prononcé (peti-te). */
+  function alternatives(raw) {
+    var w = clean(raw), e = entry(w), out = [], seen = {};
+    function add(s) { if (s && !seen[s]) { seen[s] = 1; out.push(s); } }
+    add(e.syll);
+    (e.alts || []).forEach(add);
+    (EXTRA[w] || []).forEach(add);
+    var ph = e.syll.replace(/-/g, ''), nv = 0, ns = 0;
+    for (var i = 0; i < ph.length; i++) { if (P.isVow(ph[i])) nv++; if (ph[i] === '°') ns++; }
+    if (ns && ph.length > ns) add(P.syllabify(ph.replace(/°/g, '')).join('-'));
+    if (nv && /[^aeiouyàâéèêëîïôöùûü'\-]e(s|nt)?$/.test(w) && !P.isVow(ph[ph.length - 1])) add(P.syllabify(ph + '°').join('-'));
+    return out;
+  }
   function known(raw) { var w = clean(raw); return !!custom[w] || variants(w).length > 0; }
 
   function setCustom(map) { custom = map || {}; cache.clear(); }
@@ -128,7 +151,7 @@
   /* opts : mode 'rime' | 'asso', nsyl (0 = tout, 5 = 5 et +), pos (masque), freq (seuil 0-9), argot, limit */
   function search(query, opts) {
     opts = opts || {};
-    var qsyll = phrase(query);
+    var qsyll = opts.syll || phrase(query);
     var qn = P.norm(qsyll.replace(/-/g, ''));
     var lastV = -1, qs = '', i;
     for (i = 0; i < qn.length; i++) if (P.isVow(qn[i])) { lastV = i; qs += qn[i]; }
@@ -185,7 +208,46 @@
     return { syll: qsyll, groups: groups, total: total, minL: minL };
   }
 
+  /* Rime en deux mots : on coupe le son cherché en deux et on propose une liste pour chaque moitié. */
+  function twoWords(query, opts) {
+    opts = opts || {};
+    var qsyll = opts.syll || phrase(query);
+    var parts = qsyll.split('-').map(P.norm).filter(function (p) { return /[aiyuoE25@§]/.test(p); });
+    var k = parts.length, out = { syll: qsyll, splits: [] };
+    if (k < 2 || k > 6) return out;
+    prep();
+    var minF = Math.max(opts.freq || 0, 3);
+    var qwords = {}; (clean(query).match(/[a-zà-öø-ÿ'\-]+/g) || []).forEach(function (w) { qwords[w] = 1; });
+    function vow(s) { var o = ''; for (var i = 0; i < s.length; i++) if (P.isVow(s[i])) o += s[i]; return o; }
+    function same(a, b) { var x = a.length - 1, y = b.length - 1, n = 0; while (x >= 0 && y >= 0 && a.charCodeAt(x) === b.charCodeAt(y)) { n++; x--; y--; } return n; }
+    for (var s = 1; s < k; s++) {
+      var left = parts.slice(0, s).join(''), right = parts.slice(s).join('');
+      var lsk = vow(left), rsk = vow(right);
+      var fv = 0; while (fv < right.length && !P.isVow(right[fv])) fv++;
+      var tail = right.slice(fv);
+      var A = [], B = [];
+      for (var i = 0; i < N; i++) {
+        if (freq[i] < minF || (flags[i] & F.PROPRE) || qwords[words[i]]) continue;
+        if (words[i].length === 1 && 'aàyô'.indexOf(words[i]) < 0) continue;          // noms de lettres
+        var pn = normPh[i];
+        if (nsyl[i] === k - s && skel[i] === rsk && pn.length >= tail.length && pn.slice(pn.length - tail.length) === tail)
+          B.push({ w: words[i], syll: sylls[i], flags: flags[i], f: freq[i], sc: same(right, pn) * 10 + freq[i] });
+        if (nsyl[i] === s && skel[i] === lsk)
+          A.push({ w: words[i], syll: sylls[i], flags: flags[i], f: freq[i], sc: same(left, pn) * 10 + freq[i] - (flags[i] === 16 ? 4 : 0) });
+      }
+      var top = function (arr) {
+        var seen = {};
+        return arr.sort(function (x, y) { return y.sc - x.sc || (x.w < y.w ? -1 : 1); })
+          .filter(function (r) { if (seen[r.w]) return false; seen[r.w] = 1; return true; }).slice(0, opts.limit || 36);
+      };
+      A = top(A); B = top(B);
+      if (A.length && B.length) out.splits.push({ left: s, right: k - s, a: A, b: B });
+    }
+    return out;
+  }
+
   root.Dict = {
+    entryWith: entryWith, alternatives: alternatives, twoWords: twoWords,
     F: F, load: load, variants: variants, entry: entry, known: known, setCustom: setCustom,
     phrase: phrase, search: search, splitToken: splitToken, WORD_RE: WORD_RE, clean: clean,
     size: function () { return N; }

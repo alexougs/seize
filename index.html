@@ -27,6 +27,10 @@
       <button class="btn primary" id="new-doc">Nouveau texte</button>
       <button class="btn" id="new-folder">Nouveau dossier</button>
     </div>
+    <div class="ideas-row">
+      <button class="doc" id="open-ideas"><b>Carnet d’idées</b><small id="ideas-sub">Phases et punchlines en vrac</small></button>
+      <button class="icon-btn" id="add-idea" aria-label="Noter une idée"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+    </div>
     <div id="lib-list"></div>
     <div class="lib-foot">
       <button class="link-btn" id="open-settings">Réglages et sauvegarde</button>
@@ -56,6 +60,7 @@
       </div>
       <label class="tog"><input type="checkbox" id="opt-allit"><span>Allitérations</span></label>
       <label class="tog"><input type="checkbox" id="opt-bars"><span>Mesures</span></label>
+      <label class="tog"><input type="checkbox" id="opt-scheme"><span>Schéma</span></label>
       <div id="chips" aria-label="Sons présents"></div>
     </div>
 
@@ -88,6 +93,7 @@
       <div class="seg small" role="group" aria-label="Type de rime">
         <button data-mode="rime">Rimes</button>
         <button data-mode="asso">Assonances</button>
+        <button data-mode="duo">En deux mots</button>
       </div>
       <select id="f-syl" aria-label="Nombre de syllabes">
         <option value="0">Syllabes : toutes</option><option value="1">1 syllabe</option><option value="2">2 syllabes</option>
@@ -101,6 +107,7 @@
         <option value="0">Tous les mots</option><option value="3">Mots courants</option><option value="5">Très courants</option>
       </select>
       <label class="tog"><input type="checkbox" id="f-argot"><span>Argot</span></label>
+      <label class="tog" title="Les mots touchés vont dans la réserve du texte au lieu d’être ajoutés"><input type="checkbox" id="f-pin"><span>Vers la réserve</span></label>
     </div>
     <div id="results" aria-live="polite"></div>
   </section>
