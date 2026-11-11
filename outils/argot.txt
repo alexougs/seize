@@ -1,0 +1,369 @@
+# mot [sons en code Lexique | = pour laisser le moteur deviner] [n|v|a]
+# Les mots déjà présents dans le dictionnaire reçoivent juste l'étiquette « argot ».
+wesh wES
+wallah wala
+wallou walu
+walou walu
+seum s9m
+chelou S°lu a
+relou R°lu a
+tess tEs
+téci tesi
+tieks tjEks
+tiekar tjekaR
+tiéquar tjekaR
+keum k9m
+reum R9m
+reup R9p
+reuf R9f
+reus R9s
+rebeu R°b2
+rebeus R°b2
+renoi R°nwa
+renois R°nwa
+babtou babtu
+babtous babtu
+kiffer kife v
+kiffe kif v
+kiffes kif v
+kiffé kife v
+kiffée kife v
+kiffent kif v
+kiffais kifE v
+kiffait kifE v
+kiffant kif@ a
+kif =
+bicrave bikRav v
+bicraver bikRave v
+bicraveur bikRav9R
+bicraveurs bikRav9R
+charbonner SaRbOne v
+charbonne SaRbOn v
+charbonné SaRbOne v
+charbonneur SaRbOn9R
+charbonneurs SaRbOn9R
+moula mula
+maille =
+biff bif
+bifton bift§
+biftons bift§
+khaliss Ralis
+kichta kiSta
+kichtas kiSta
+lové love
+lovés love
+flouze =
+thune =
+thunes =
+oseille =
+pèze =
+pognon =
+fric =
+cash kaS
+bénef benEf
+bénefs benEf
+frérot =
+frero fReRo
+frerot fReRo
+poto poto
+potos poto
+pote =
+potes =
+igo igo
+khey REj
+kho Ro
+khoya Roja
+zin zin
+gadjo =
+gadji gadZi
+gadjis gadZi
+go =
+meuf =
+meufs m9f
+zouz zuz
+racli Rakli
+daron =
+daronne =
+darons =
+daronnes =
+ouf =
+chanmé S@me a
+cheum S9m a
+guedin g°d5 a
+teubé t9be a
+teub t9b
+zeub z9b
+zbeul zb9l
+teuf t9f
+teufs t9f
+teufeur t9f9R
+tise tiz
+tiser tize v
+tisé tize v
+pillave pijav v
+pillaver pijave v
+bédave bedav v
+bédaver bedave v
+bédo bedo
+bédos bedo
+beuh =
+weed wid
+shit =
+teuch t9S
+teushi t9Si
+tarpé taRpe
+spliff splif
+foncedé f§sde a
+foncedés f§sde a
+khapta Rapta a
+tèj tEZ v
+tej tEZ v
+ken kEn v
+pécho peSo v
+keuf k9f
+keufs k9f
+schmitt Smit
+schmitts Smit
+condé =
+condés =
+hendek EndEk
+hnouch nuS
+gardav gaRdav
+gav gav
+zonz z§z
+zonzon =
+hebs Eps
+bendo bEndo
+binks binks
+rainté R5te
+chouf Suf
+choufer Sufe v
+plavon plav§
+gova gova
+gamos gamos
+gun g9n
+guns g9n
+glock glOk
+kalash kalaS
+kalach kalaS
+brolique bRolik
+broliques bRolik
+flingue =
+uzi uzi
+hess Es
+hagra agRa
+hagar agaR v
+haram aRam
+halal alal
+hlel lEl
+sheitan SEtan
+cheitan SEtan
+sah sa
+starfoullah staRfula
+hamdoullah amdula
+hamdoulilah amdulila
+inchallah inSala
+mashallah maSala
+bismillah bismila
+miskine miskin
+meskine mEskin
+zehma zEma
+zaama zama
+zerma zERma
+crari kRaRi
+belek belEk
+bsahtek bsatEk
+chouia Suja
+khlass Rlas
+hchouma Suma
+dinguerie d5g°Ri
+dingueries d5g°Ri
+masterclass mastERklas
+banger b@g9R
+bangers b@g9R
+flow flo
+flows flo
+freestyle fRistajl
+freestyles fRistajl
+punchline p9nSlajn
+punchlines p9nSlajn
+punch p9nS
+beat bit
+beats bits
+beatmaker bitmEk9R
+beatmakers bitmEk9R
+instru 5stRy
+instrus 5stRy
+prod pROd
+prods pROd
+sample s@p9l
+samples s@p9l
+drill dRil
+trap tRap
+rap =
+rappeur =
+rappeurs Rap9R
+rappeuse Rap2z
+rapper Rape v
+rappe Rap v
+feat fit
+featuring fitSoRiG
+mixtape mikstEp
+mixtapes mikstEp
+clash klaS
+clasher klaSe v
+diss dis
+disser dise v
+kicker kike v
+kické kike v
+kick kik
+flex flEks
+flexer flEkse v
+swag swag
+hype ajp
+buzz b9z
+game gEm
+rookie Ruki
+thug t9g
+thugs t9g
+gang =
+gangs =
+gangsta g@gsta
+gangster =
+gangsters =
+hustler 9sl9R
+hustle 9s9l
+dealer =
+dealers =
+deal dil
+boss bOs
+big big a
+fake fEk a
+hater Et9R
+haters Et9Rs
+crew kRu
+squad skwad
+team tim
+bro bRo
+mood mud
+vibe vajb
+vibes vajb
+chill tSil
+chiller tSile v
+cool =
+fresh fRES a
+clean klin a
+money mOnE
+bizness biznEs
+biz biz
+bitch bitS
+shawty Soti
+bae bE
+boy bOj
+girl g9Rl
+love lOv
+life lajf
+street stRit
+streets stRit
+hood ud
+ghetto =
+block blOk
+blocks blOk
+bled =
+blédard bledaR
+bledard bledaR
+bails bajl
+blaze blaz
+blase blaz
+boloss bolOs
+bolos bolOs
+baltringue baltR5g
+tocard =
+caillera =
+racaille =
+lascar =
+vénère =
+véner venER a
+rageux RaZ2
+askip aski
+cimer simER
+ziva ziva
+zyva ziva
+taf =
+taffer tafe v
+taffe taf v
+sapé sape a
+sapes sap
+peura p9Ra
+zik zik
+zikmu zikmy
+tipeu tip2
+oim wam
+oit wat
+ouais =
+mytho mito
+mythos mito
+mythonner mitOne v
+poucave pukav
+poukave pukav
+crevard kR°vaR
+crevards kR°vaR
+dalleux dal2
+bouillave bujav v
+nique nik v
+niquer nike v
+niqué nike v
+boug bug
+bougs bug
+shlag Slag
+schlag Slag
+cassos kasOs
+clodo =
+michto miSto
+tchoin tSw5
+pookie puki
+djinn dZin
+mec =
+mecs =
+gars =
+nana =
+gosse =
+bagnole =
+caisse =
+baraque =
+piaule =
+bouffe =
+bouffer =
+clope =
+taule =
+taulard =
+mitard =
+flic =
+flics =
+balance =
+bâtard =
+embrouille =
+embrouilles =
+galère =
+galérer =
+charo SaRo
+charos SaRo
+bg beZe
+dz dZEd
+tmax temaks
+bécane =
+gamberge =
+gamberger =
+cogiter =
+zoner =
+zone =
+tiser =
+pote =
+soss sOs
+sosa sosa
+fréro fReRo
+wsh wES
+y' j
+ya ja
+yo jo
+ouais =

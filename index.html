@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Seize — carnet de rimes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#eef0f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11141b" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Seize">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+
+  <aside id="lib" aria-label="Mes textes">
+    <div class="lib-head">
+      <span class="wordmark">Seize</span>
+      <button class="icon-btn only-narrow" id="lib-close" aria-label="Fermer la liste des textes"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="lib-actions">
+      <button class="btn primary" id="new-doc">Nouveau texte</button>
+      <button class="btn" id="new-folder">Nouveau dossier</button>
+    </div>
+    <div id="lib-list"></div>
+    <div class="lib-foot">
+      <button class="link-btn" id="open-settings">Réglages et sauvegarde</button>
+      <span id="save-state"></span>
+    </div>
+  </aside>
+  <div id="scrim" hidden></div>
+
+  <main id="main">
+    <header id="top">
+      <button class="icon-btn only-narrow" id="btn-lib" aria-label="Mes textes"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>
+      <input id="title" type="text" placeholder="Titre du texte" aria-label="Titre du texte" autocomplete="off">
+      <span id="count" aria-live="polite"></span>
+      <button class="icon-btn" id="btn-more" aria-label="Options du texte"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button>
+    </header>
+
+    <div id="stage">
+      <textarea id="ed" spellcheck="true" autocapitalize="sentences" placeholder="Écris ton texte ici. Une ligne vide sépare deux blocs de rimes." aria-label="Texte"></textarea>
+      <div id="view" hidden aria-label="Texte coloré"></div>
+    </div>
+
+    <div id="legend" hidden>
+      <div class="seg" role="group" aria-label="Ce qui est coloré">
+        <button data-level="rimes">Rimes</button>
+        <button data-level="asso">Rimes + assonances</button>
+        <button data-level="tout">Tout</button>
+      </div>
+      <label class="tog"><input type="checkbox" id="opt-allit"><span>Allitérations</span></label>
+      <label class="tog"><input type="checkbox" id="opt-bars"><span>Mesures</span></label>
+      <div id="chips" aria-label="Sons présents"></div>
+    </div>
+
+    <nav id="bar">
+      <button class="bar-btn" id="btn-color" aria-pressed="false">
+        <svg viewBox="0 0 24 24"><path d="M4 20h4l10-10-4-4L4 16v4zM13 7l4 4"/><path d="M14 20h6" class="hl"/></svg>
+        <span class="long">Colorer les rimes</span><span class="short">Colorer</span>
+      </button>
+      <button class="bar-btn" id="btn-find">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg>
+        <span>Trouver une rime</span>
+      </button>
+      <button class="bar-btn" id="btn-section">
+        <svg viewBox="0 0 24 24"><path d="M8 4H5v16h3M16 4h3v16h-3"/></svg>
+        <span>Section</span>
+      </button>
+    </nav>
+  </main>
+
+  <section id="find" hidden aria-label="Trouver une rime">
+    <div class="find-head">
+      <input id="q" type="search" placeholder="Un mot, ou la fin d’un vers" aria-label="Mot à faire rimer" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+      <button class="icon-btn" id="find-close" aria-label="Fermer la recherche"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="find-sub">
+      <button class="link-btn" id="q-line">Reprendre la fin du vers</button>
+      <span id="heard"></span>
+    </div>
+    <div class="find-filters">
+      <div class="seg small" role="group" aria-label="Type de rime">
+        <button data-mode="rime">Rimes</button>
+        <button data-mode="asso">Assonances</button>
+      </div>
+      <select id="f-syl" aria-label="Nombre de syllabes">
+        <option value="0">Syllabes : toutes</option><option value="1">1 syllabe</option><option value="2">2 syllabes</option>
+        <option value="3">3 syllabes</option><option value="4">4 syllabes</option><option value="5">5 et plus</option>
+      </select>
+      <select id="f-pos" aria-label="Type de mot">
+        <option value="0">Type : tous</option><option value="1">Noms</option><option value="2">Verbes</option>
+        <option value="4">Adjectifs</option><option value="8">Adverbes</option>
+      </select>
+      <select id="f-freq" aria-label="Fréquence des mots">
+        <option value="0">Tous les mots</option><option value="3">Mots courants</option><option value="5">Très courants</option>
+      </select>
+      <label class="tog"><input type="checkbox" id="f-argot"><span>Argot</span></label>
+    </div>
+    <div id="results" aria-live="polite"></div>
+  </section>
+</div>
+
+<div id="sheet" hidden><div id="sheet-box" role="dialog" aria-modal="true"></div></div>
+<div id="toast" hidden role="status"></div>
+
+<script src="js/phon.js"></script>
+<script src="js/dict.js"></script>
+<script src="js/rhyme.js"></script>
+<script src="js/store.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
