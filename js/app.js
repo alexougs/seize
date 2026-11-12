@@ -11,6 +11,7 @@
   var lib = { folders: [], docs: [], settings: JSON.parse(JSON.stringify(DEFAULTS)), custom: {} };
   var cur = null, text = '', colorOn = false, analysis = null, caret = 0, dictReady = false;
   var dirty = false, baselineDone = false, lastAuto = 0, findLimit = 300, selTok = null;
+  var hidden = {}, chipLong = false, chipTimer = null, drag = null, justDragged = false;
   var pron = {}, pins = [], isolate = null, ctxTok = null;     // prononciations choisies par vers, réserve de rimes, son isolé, mot touché
   function anOpts() { return { pron: function (lt, ti) { var m = pron[lt]; return m ? m[ti] : null; } }; }
   function docBody() {
@@ -165,7 +166,7 @@
     flush();
     cur = docMeta(id); if (!cur) return;
     var body = S.get('doc:' + id) || {};
-    text = body.text || ''; pron = body.pron || {}; pins = (body.pins || []).slice(); isolate = null; ctxTok = null;
+    text = body.text || ''; pron = body.pron || {}; pins = (body.pins || []).slice(); isolate = null; hidden = {}; ctxTok = null;
     el.ed.value = text; el.title.value = cur.title || ''; el.title.readOnly = id === 'idees';
     caret = text.length; baselineDone = false; dirty = false; selTok = null;
     lib.settings.last = id; saveLib();
@@ -200,17 +201,16 @@
   function renderLib() {
     var html = '';
     function docsOf(fid) {
-      return lib.docs.filter(function (d) { return d.id !== 'idees' && (d.folder || null) === fid; }).sort(function (a, b) { return b.updated - a.updated; })
+      return lib.docs.filter(function (d) { return d.id !== 'idees' && (d.folder || null) === fid; })
         .map(function (d) {
           return '<button class="doc" data-doc="' + d.id + '"' + (cur && cur.id === d.id ? ' aria-current="true"' : '') + '><b>' + esc(d.title || 'Sans titre') +
             '</b><small>' + esc(firstLine(d.id)) + '</small></button>';
         }).join('');
     }
-    var loose = docsOf(null);
-    html += loose;
+    html += '<div class="loose" data-zone="">' + docsOf(null) + '</div>';
     lib.folders.forEach(function (f) {
       var inner = docsOf(f.id);
-      html += '<div class="folder"><div class="folder-head"><span class="name">' + esc(f.name) + '</span>' +
+      html += '<div class="folder" data-zone="' + f.id + '"><div class="folder-head"><span class="name">' + esc(f.name) + '</span>' +
         '<button class="icon-btn" data-addin="' + f.id + '" aria-label="Nouveau texte dans ' + esc(f.name) + '"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>' +
         '<button class="icon-btn" data-folder="' + f.id + '" aria-label="Options du dossier ' + esc(f.name) + '"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></div>' +
         (inner || '<div class="empty">Dossier vide</div>') + '</div>';
@@ -287,7 +287,7 @@
       }
       var cls = 'ln' + (line.kind === 'section' ? ' section' : '') + (st.bars && line.kind === 'verse' && line.bar % 4 === 0 ? ' four' : '');
       var body = '';
-      R.runs(analysis, li, st.level, st.allit, isolate).forEach(function (r) {
+      R.runs(analysis, li, st.level, st.allit, isolate, hidden).forEach(function (r) {
         var c = [];
         if (r.lvl >= 2) { c.push('r', 'c-' + r.cls); if (r.cls === 'in') c.push('in'); }
         else if (r.lvl === 1) c.push('s', 'c-' + r.cls);
@@ -302,9 +302,10 @@
     closeBlock();
     el.view.innerHTML = html || '<div class="hint">Le texte est vide. Touche « Modifier le texte » pour écrire.</div>';
     var chips = P.CLASSES.filter(function (c) { return used[c]; }).map(function (c) {
-      return '<button class="chip r c-' + c + (c === 'in' ? ' in' : '') + '" data-iso="' + c + '" aria-pressed="' + (isolate === c) + '" title="Ne montrer que ce son">' + P.CLASS_LABEL[c] + '</button>';
+      var shown = isolate ? isolate === c : !hidden[c];
+      return '<button class="chip r c-' + c + (c === 'in' ? ' in' : '') + (isolate === c ? ' solo' : '') + '" data-iso="' + c + '" aria-pressed="' + shown + '" title="Toucher : masquer ou réafficher. Appui long : ce son seul.">' + P.CLASS_LABEL[c] + '</button>';
     }).join('');
-    el.chips.classList.toggle('iso', !!isolate);
+    if (isolate || Object.keys(hidden).length) chips += '<button class="chip reset" data-showall>Tout afficher</button>';
     if (st.allit && !isolate) chips += P.CFAMS.filter(function (f) { return usedFam[f]; }).map(function (f) {
       return '<span class="chip al f-' + f + '">' + P.CFAM_LABEL[f] + '</span>';
     }).join('');
@@ -315,10 +316,25 @@
   el.color.addEventListener('click', function () { setColor(!colorOn); if (!colorOn) el.ed.focus(); });
   el.legend.addEventListener('click', function (e) {
     var iso = e.target.closest('[data-iso]');
-    if (iso) { isolate = isolate === iso.dataset.iso ? null : iso.dataset.iso; renderView(); return; }
+    if (e.target.closest('[data-showall]')) { hidden = {}; isolate = null; renderView(); return; }
+    if (iso) {
+      if (chipLong) { chipLong = false; return; }
+      if (isolate) isolate = null;                                   // on sortait du son seul
+      else if (hidden[iso.dataset.iso]) delete hidden[iso.dataset.iso]; else hidden[iso.dataset.iso] = 1;
+      renderView(); return;
+    }
     var b = e.target.closest('[data-level]'); if (!b) return;
     lib.settings.level = b.dataset.level; isolate = null; saveLib(); renderView();
   });
+  // appui long sur une pastille : ce son seul
+  el.chips.addEventListener('pointerdown', function (e) {
+    var c = e.target.closest('[data-iso]'); chipLong = false; clearTimeout(chipTimer);
+    if (!c) return;
+    var cls = c.dataset.iso;
+    chipTimer = setTimeout(function () { chipLong = true; isolate = cls; hidden = {}; renderView(); }, 450);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (t) { el.chips.addEventListener(t, function () { clearTimeout(chipTimer); }); });
+  el.chips.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   $('opt-allit').addEventListener('change', function (e) { lib.settings.allit = e.target.checked; saveLib(); renderView(); });
   $('opt-bars').addEventListener('change', function (e) { lib.settings.bars = e.target.checked; saveLib(); renderView(); });
   $('opt-scheme').addEventListener('change', function (e) { lib.settings.scheme = e.target.checked; saveLib(); renderView(); });
@@ -600,7 +616,86 @@
   $('new-folder').addEventListener('click', function () {
     ask('Nouveau dossier', 'Nom du dossier', '', 'Créer', function (name) { lib.folders.push({ id: uid(), name: name }); S.set('lib', lib); renderLib(); });
   });
+  /* glisser-déposer : ranger un texte, ordonner textes et dossiers (appui long au doigt) */
+  function dragClear() { Array.prototype.forEach.call(el.list.querySelectorAll('.drop-before,.drop-after,.drop-in,.dragging'), function (x) { x.classList.remove('drop-before', 'drop-after', 'drop-in', 'dragging'); }); }
+  function dragStart() {
+    if (!drag || drag.on) return;
+    drag.on = true; clearTimeout(drag.timer);
+    drag.ghost = drag.src.cloneNode(true); drag.ghost.className += ' ghost';
+    var r = drag.src.getBoundingClientRect();
+    drag.ghost.style.width = r.width + 'px'; drag.dx = drag.x - r.left; drag.dy = drag.y - r.top;
+    document.body.appendChild(drag.ghost); el.list.classList.add('drag-on');
+    dragMove(drag.x, drag.y);
+  }
+  function dragMove(x, y) {
+    drag.x = x; drag.y = y;
+    drag.ghost.style.transform = 'translate(' + (x - drag.dx) + 'px,' + (y - drag.dy) + 'px)';
+    var lr = el.list.getBoundingClientRect();
+    if (y < lr.top + 36) el.list.scrollTop -= 10; else if (y > lr.bottom - 36) el.list.scrollTop += 10;
+    dragClear(); drag.src.classList.add('dragging'); drag.target = null;
+    var under = document.elementFromPoint(x, y); if (!under || !el.list.contains(under)) return;
+    var zone = under.closest('[data-zone]'), mid;
+    if (drag.kind === 'folder') {
+      var fo = under.closest('.folder');
+      if (fo && fo.dataset.zone !== drag.id) { mid = fo.getBoundingClientRect(); var aft = y > mid.top + mid.height / 2; fo.classList.add(aft ? 'drop-after' : 'drop-before'); drag.target = { folder: fo.dataset.zone, after: aft }; }
+      else if (!fo && zone) { drag.target = { folder: null }; }            // au-dessus de tous les dossiers
+      return;
+    }
+    var d = under.closest('.doc[data-doc]');
+    if (d && d.dataset.doc !== drag.id) {
+      mid = d.getBoundingClientRect(); var after = y > mid.top + mid.height / 2;
+      d.classList.add(after ? 'drop-after' : 'drop-before');
+      drag.target = { doc: d.dataset.doc, after: after, zone: d.closest('[data-zone]').dataset.zone || null };
+    } else if (zone && !d) { zone.classList.add('drop-in'); drag.target = { zone: zone.dataset.zone || null }; }
+    else if (!zone) { var lo = el.list.querySelector('.loose'); lo.classList.add('drop-in'); drag.target = { zone: null }; }
+  }
+  function dragEnd(apply) {
+    if (!drag) return;
+    clearTimeout(drag.timer);
+    var d = drag; drag = null;
+    if (!d.on) return;
+    if (d.ghost) d.ghost.remove();
+    el.list.classList.remove('drag-on'); dragClear();
+    justDragged = true; setTimeout(function () { justDragged = false; }, 60);
+    var t = d.target; if (!apply || !t) return;
+    var i, item;
+    if (d.kind === 'folder') {
+      i = lib.folders.findIndex(function (f) { return f.id === d.id; }); item = lib.folders.splice(i, 1)[0];
+      if (t.folder == null) lib.folders.unshift(item);
+      else { i = lib.folders.findIndex(function (f) { return f.id === t.folder; }); lib.folders.splice(i + (t.after ? 1 : 0), 0, item); }
+    } else {
+      i = lib.docs.findIndex(function (x) { return x.id === d.id; }); item = lib.docs.splice(i, 1)[0];
+      item.folder = t.zone || null;
+      if (t.doc) { i = lib.docs.findIndex(function (x) { return x.id === t.doc; }); lib.docs.splice(i + (t.after ? 1 : 0), 0, item); }
+      else lib.docs.push(item);                                           // lâché sur le dossier : à la fin
+    }
+    S.set('lib', lib); renderLib();
+  }
+  el.list.addEventListener('pointerdown', function (e) {
+    if (e.button > 0 || e.target.closest('.icon-btn')) return;
+    var doc = e.target.closest('.doc[data-doc]'), head = e.target.closest('.folder-head');
+    if (!doc && !head) return;
+    drag = { kind: doc ? 'doc' : 'folder', id: doc ? doc.dataset.doc : head.parentNode.dataset.zone, src: doc || head.parentNode, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, touch: e.pointerType !== 'mouse', on: false };
+    if (drag.touch) drag.timer = setTimeout(dragStart, 420);
+  });
+  document.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var far = Math.abs(e.clientX - drag.sx) + Math.abs(e.clientY - drag.sy);
+    if (!drag.on) {
+      if (drag.touch) { if (far > 10) dragEnd(false); return; }           // le doigt a bougé : c'est un défilement
+      if (far < 6) return;
+      dragStart();
+    }
+    e.preventDefault(); dragMove(e.clientX, e.clientY);
+  });
+  document.addEventListener('pointerup', function () { dragEnd(true); });
+  document.addEventListener('pointercancel', function () { dragEnd(false); });
+  document.addEventListener('touchmove', function (e) { if (drag && drag.on) e.preventDefault(); }, { passive: false });
+  el.list.addEventListener('contextmenu', function (e) { if (e.target.closest('.doc, .folder-head')) e.preventDefault(); });
+  el.list.addEventListener('dragstart', function (e) { e.preventDefault(); });
+
   el.list.addEventListener('click', function (e) {
+    if (justDragged) return;
     var d = e.target.closest('[data-doc]'); if (d) return openDoc(d.dataset.doc);
     var a = e.target.closest('[data-addin]'); if (a) { flush(); var m = newDocMeta(a.dataset.addin); openDoc(m.id); if (colorOn) setColor(false); el.title.focus(); return; }
     var fb = e.target.closest('[data-folder]'); if (!fb) return;
@@ -688,6 +783,7 @@
   }
 
   document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && drag) { dragEnd(false); return; }
     if (e.key === 'Escape') { if (!el.sheet.hidden) closeSheet(); else if (!el.find.hidden) closeFind(); else closeLib(); }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openFind(null); }
   });

@@ -158,13 +158,14 @@
 
   /* Découpe un vers en morceaux prêts à afficher : [{t, cls, lvl, fam}]
      level : 'rimes' | 'asso' | 'tout' ; allit : booléen */
-  function runs(res, li, level, withAllit, only) {
+  function runs(res, li, level, withAllit, only, hide) {
     var line = res.lines[li], text = line.text, n = text.length;
     if (line.kind !== 'verse') return [{ t: text }];
     var cls = new Array(n), lvl = new Array(n), fam = new Array(n), sid = new Array(n), tk = new Array(n);
     line.tokens.forEach(function (t, ti) { for (var c = t.s; c < t.e && c < n; c++) tk[c] = ti; });
     for (var q = line.first; q < line.last; q++) {
       var s = res.syl[q], L = 0;
+      if (hide && hide[s.cls]) continue;
       if (only) { if (s.cls === only && !(s.weak && !s.rh)) L = s.rh ? s.rh + 1 : 1; }     // un seul son, partout où il sonne
       else if (s.rh) L = s.rh + 1;                     // 2 = rime, 3 = rime riche
       else if (!s.weak && (level === 'tout' || (level === 'asso' && s.as))) L = 1;
